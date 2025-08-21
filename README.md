@@ -107,14 +107,6 @@ gemini-prompt-optimization/
 
 ---
 
-## 🐞 **Troubleshooting**
-
-- `ERR_MODULE_NOT_FOUND: dotenv` → `npm i dotenv` and add `import "dotenv/config";` at the top of `server.js`
-- `{ ok: true, hasKey: false }` on `/health` → check `.env` and environment variable loading
-- JSON parse error → verify `responseMimeType/responseSchema` are set in `generationConfig`
-
----
-
 ## 📄 **License**
 
 Distributed under the **[MIT License](LICENSE)**.
