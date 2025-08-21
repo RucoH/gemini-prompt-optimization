@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gemini 3 Cümle Özeti</title>
+  <style>
+    :root {
+      --bg: #0b0f0e; --panel:#121618; --text:#ecf2f1; --muted:#b6c8c4; --brand:#00c896; --brand-600:#00a77d; --danger:#ff6464;
+      --radius: 16px; --ring: rgba(0,200,150,.35); --shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+    html, body { height: 100%; }
+    body { margin: 0; background: radial-gradient(1200px 800px at 80% -10%, rgba(0,200,150,.08), transparent 60%), var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji"; }
+    .wrap { max-width: 900px; margin: 48px auto; padding: 0 20px; }
+    h1 { font-size: 28px; letter-spacing:.2px; margin: 0 0 18px; }
+    p.lead { color: var(--muted); margin-top: 0; }
+
+    form { background: var(--panel); border: 1px solid rgba(255,255,255,.06); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
+    label { display: block; font-weight: 600; margin: 4px 0 8px; }
+    textarea { width: 100%; min-height: 140px; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,.08); background: #0e1214; color: var(--text); resize: vertical; outline: none; }
+    textarea:focus { border-color: var(--brand); box-shadow: 0 0 0 4px var(--ring); }
+
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; }
+    .muted { color: var(--muted); }
+    .small { font-size: 13px; color: var(--muted); }
+
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    button { appearance: none; border: 0; padding: 10px 14px; border-radius: 12px; cursor: pointer; font-weight: 600; transition: transform .04s ease, box-shadow .2s ease; }
+    button:active { transform: translateY(1px); }
+    .btn { background: #21282c; color: var(--text); border: 1px solid rgba(255,255,255,.06); }
+    .btn:hover { box-shadow: var(--shadow); }
+    .btn-primary { background: var(--brand); color: #01261d; }
+    .btn-primary:hover { background: var(--brand-600); }
+    .btn-danger { background: #2b1717; color: #ffdede; border: 1px solid rgba(255, 100, 100, .35); }
+
+    .card { margin-top: 18px; background: var(--panel); border: 1px solid rgba(255,255,255,.06); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
+    .card h2 { margin: 0 0 8px; font-size: 18px; }
+    .result { font-size: 17px; }
+
+    .error { margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: #2b1717; color: #ffdede; border: 1px solid rgba(255, 100, 100, .35); }
+    .status { margin-top: 10px; color: var(--muted); }
+
+    footer { margin: 18px 0; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    code { background: #0e1214; padding: 2px 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,.06); }
+    a { color: var(--brand); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <h1>🧠 Gemini 3 Cümle Özeti</h1>
+    <p class="lead">Metni gir, <em>en fazla üç tam cümle</em>lik özet al. Sunucu: <code id="apiBase"></code></p>
+
+    <form id="form" novalidate>
+      <label for="input">Metin</label>
+      <textarea id="input" placeholder="Özetlemek istediğiniz metni girin…"></textarea>
+      <div class="row">
+        <span id="counter" class="small">0 karakter</span>
+        <div class="actions">
+          <button class="btn" type="button" id="fill">Örnek metin</button>
+          <button class="btn" type="button" id="ping">Sağlık kontrolü</button>
+          <button class="btn" type="reset" id="clear">Temizle</button>
+          <button class="btn btn-primary" type="submit" id="submit">Özetle (Ctrl/⌘+Enter)</button>
+        </div>
+      </div>
+      <div id="status" class="status" hidden>Çalışıyor…</div>
+    </form>
+
+    <section id="resultCard" class="card" hidden>
+      <h2>Özet</h2>
+      <p id="summary" class="result"></p>
+      <div class="row">
+        <span class="small">Yanıt 3 cümle ile sınırlıdır.</span>
+        <div class="actions">
+          <button class="btn" type="button" id="copy">Kopyala</button>
+        </div>
+      </div>
+    </section>
+
+    <div id="error" class="error" hidden></div>
+
+    <footer class="small">
+      API tabanı: <code id="apiBaseFoot"></code>
+      · <a href="#" id="cfg">(değiştir)</a>
+    </footer>
+  </main>
+
+  <script>
+    // --- Ayarlar ---
+    const API_BASE = (localStorage.getItem('api_base') || 'http://localhost:3000').replace(/\/$/, '');
+    const API_SUMMARY = API_BASE + '/api/summary';
+    const API_HEALTH = API_BASE + '/health';
+
+    // --- DOM ---
+    const el = (id) => document.getElementById(id);
+    const input = el('input');
+    const counter = el('counter');
+    const statusEl = el('status');
+    const errorEl = el('error');
+    const resultCard = el('resultCard');
+    const summaryEl = el('summary');
+    const submitBtn = el('submit');
+    const copyBtn = el('copy');
+
+    // API gösterimi
+    document.getElementById('apiBase').textContent = API_SUMMARY;
+    document.getElementById('apiBaseFoot').textContent = API_BASE;
+
+    // --- Yardımcılar ---
+    function setLoading(v){
+      statusEl.hidden = !v;
+      submitBtn.disabled = v;
+    }
+    function showError(msg){ errorEl.textContent = msg; errorEl.hidden = !msg; }
+    function showResult(text){ summaryEl.textContent = text; resultCard.hidden = !text; }
+    function updateCounter(){
+      const len = (input.value || '').length;
+      counter.textContent = len + ' karakter';
+    }
+
+    // --- Örnek metin ---
+    const sample = "Vestel Sağlık Nasıl Kuruldu?";
+
+    // --- Olaylar ---
+    input.addEventListener('input', updateCounter);
+
+    document.getElementById('fill').addEventListener('click', () => {
+      input.value = sample; updateCounter(); input.focus();
+    });
+
+    document.getElementById('ping').addEventListener('click', async () => {
+      showError(''); setLoading(true);
+      try {
+        const r = await fetch(API_HEALTH);
+        const j = await r.json();
+        showResult('Sunucu çalışıyor: ' + (j.ok ? 'OK' : 'HATA') + ' · Anahtar: ' + (j.hasKey ? 'var' : 'yok'));
+      } catch (e) {
+        showError('Health isteği başarısız: ' + (e?.message || e));
+      } finally { setLoading(false); }
+    });
+
+    document.getElementById('clear').addEventListener('click', () => {
+      input.value = ''; updateCounter(); showResult(''); showError(''); input.focus();
+    });
+
+    document.getElementById('cfg').addEventListener('click', (e) => {
+      e.preventDefault();
+      const cur = localStorage.getItem('api_base') || API_BASE;
+      const val = prompt('API base URL (örn: http://localhost:3000)', cur);
+      if (val) { localStorage.setItem('api_base', val.replace(/\/$/, '')); location.reload(); }
+    });
+
+    copyBtn.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(summaryEl.textContent); copyBtn.textContent = 'Kopyalandı'; setTimeout(()=> copyBtn.textContent='Kopyala', 1200); } catch {}
+    });
+
+    // Ctrl/⌘ + Enter ile gönder
+    document.addEventListener('keydown', (ev) => {
+      if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') { ev.preventDefault(); form.requestSubmit(); }
+    });
+
+    const form = document.getElementById('form');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault(); showError(''); showResult('');
+      const text = (input.value || '').trim();
+      if (!text) { showError('Lütfen özetlenecek metni girin.'); return; }
+      setLoading(true);
+      try {
+        const r = await fetch(API_SUMMARY, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text })
+        });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const j = await r.json();
+        const out = j?.summary || '';
+        if (!out) throw new Error('Boş yanıt geldi');
+        showResult(out);
+      } catch (err) {
+        showError('Özet alınamadı: ' + (err?.message || err));
+      } finally { setLoading(false); }
+    });
+
+    // İlk yükleme
+    updateCounter();
+  </script>
+</body>
+</html>
