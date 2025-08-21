@@ -1,0 +1,10 @@
+# Node.js project dependencies (install via npm)
+# These lines are informational; run `npm i <package>@<version>`
+
+@google/generative-ai@latest
+express@^4.19.2
+cors@^2.8.5
+dotenv@^16.4.5
+
+# Dev-only (optional)
+nodemon@^3.1.0
